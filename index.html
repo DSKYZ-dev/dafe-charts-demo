@@ -4,6 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DAFE Charts — Interactive Demo</title>
+  <script>
+    // ?backend=none runs the app with no backend (judge mode: synthetic data,
+    // OakGuard replays its recorded Muse Wonder run). In that mode requests to
+    // the local backend fail at once, without a network call, so the console
+    // stays clean. ?backend=<url> points at another backend. Default: the local
+    // backend on port 8788.
+    (function () {
+      var b = new URLSearchParams(location.search).get('backend');
+      if (b === 'none') {
+        window.__DAFE_JUDGE_MODE = true;
+        window.__DAFE_BACKEND_URL = 'http://127.0.0.1:9';
+        var realFetch = window.fetch.bind(window);
+        var localBackend = /^https?:\/\/(127\.0\.0\.1|localhost):(9|8788)(\/|$)/;
+        window.fetch = function (input, init) {
+          var url = typeof input === 'string' ? input : (input && input.url) || '';
+          if (localBackend.test(url)) return Promise.reject(new TypeError('No backend in judge mode'));
+          return realFetch(input, init);
+        };
+      } else if (b && /^https?:\/\//.test(b)) window.__DAFE_BACKEND_URL = b.replace(/\/$/, '');
+    })();
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
@@ -12,10 +33,20 @@
       font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
       user-select: none;
     }
+    /* One dark scrollbar for every window, matching the chart palette. */
+    *::-webkit-scrollbar { width: 6px; height: 6px; }
+    *::-webkit-scrollbar-track { background: #07070f; }
+    *::-webkit-scrollbar-thumb { background: rgba(34,204,136,0.4); border-radius: 6px; }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(34,204,136,0.6); }
+    *::-webkit-scrollbar-button { display: none; }
+    *::-webkit-scrollbar-corner { background: #07070f; }
     #chart-container { position: fixed; inset: 0; display: flex; flex-direction: column; }
     #chart-area { position: relative; flex: 1; min-height: 0; }
-    #chart-splitter { height: 5px; background: rgba(180,140,255,0.12); cursor: row-resize; flex-shrink: 0; }
-    #chart-splitter:hover { background: rgba(180,140,255,0.3); }
+    #chart-splitter { height: 8px; background: rgba(180,140,255,0.12); cursor: row-resize; flex-shrink: 0; display:flex; align-items:center; justify-content:center; position:relative; }
+    #chart-splitter:hover { background: rgba(180,140,255,0.25); }
+    #chart-splitter::after { content:'⋯'; color:rgba(255,255,255,0.35); font-size:10px; letter-spacing:2px; }
+    #chart-splitter.dragging { background: rgba(180,140,255,0.35); }
+    #pane-dominance { padding:4px 6px; border:1px solid rgba(180,140,255,0.15); border-radius:6px; background:rgba(12,12,28,0.9); color:rgba(255,255,255,0.7); font-size:11px; cursor:pointer; }
     #chart-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; z-index: 2; }
     #chart-canvas:active { cursor: grabbing; }
     #canvas-3d { position: absolute; inset: 0; width: 100%; height: 100%; display: none; z-index: 1; pointer-events: none; }
@@ -24,31 +55,21 @@
     #secondary-canvas:active { cursor: grabbing; }
 
     #draw-rail {
-      position: fixed; left: 12px; top: 50%;
-      transform: translateY(-50%); z-index: 100;
+      position: fixed; left: 12px; top: 38px; /* screen edge; main.ts placeLeftColumn stacks it under the Active Signal Models box */
+      transform: none; z-index: 100;
       display: flex; flex-direction: column; gap: 4px;
-      background: rgba(12, 12, 28, 0.88);
-      border: 1px solid rgba(180, 140, 255, 0.15);
-      border-radius: 10px; padding: 6px;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      padding: 6px;
     }
     .draw-btn {
       width: 34px; height: 34px;
       display: flex; align-items: center; justify-content: center;
-      border: none; border-radius: 7px;
-      background: transparent; color: rgba(255,255,255,0.35);
       cursor: pointer; font-size: 15px;
-      transition: all 0.15s ease; position: relative;
+      position: relative;
     }
-    .draw-btn:hover { background: rgba(180, 140, 255, 0.12); color: rgba(255,255,255,0.8); }
-    .draw-btn.active { background: rgba(180, 140, 255, 0.22); color: #b48cff; box-shadow: 0 0 12px rgba(180, 140, 255, 0.18); }
     .draw-btn .tooltip {
       position: absolute; left: calc(100% + 10px); top: 50%;
       transform: translateY(-50%);
-      background: rgba(12,12,28,0.95); color: rgba(255,255,255,0.7);
-      font-size: 11px; padding: 4px 10px; border-radius: 5px;
-      border: 1px solid rgba(180, 140, 255, 0.12);
+      font-size: 11px; padding: 4px 10px;
       white-space: nowrap; opacity: 0; pointer-events: none;
       transition: opacity 0.15s;
     }
@@ -116,15 +137,6 @@
       font-family: inherit; cursor: pointer; outline: none;
     }
     #perf-select:hover { border-color: rgba(0,204,255,0.4); }
-    #live-tick-toggle {
-      padding: 4px 10px; border: 1px solid rgba(0,255,136,0.15);
-      border-radius: 4px; background: rgba(8,8,20,0.9);
-      color: rgba(0,255,136,0.4); font-size: 10px;
-      font-family: inherit; cursor: pointer; font-weight: 600;
-      transition: all .15s;
-    }
-    #live-tick-toggle:hover { border-color: rgba(0,255,136,0.4); color: rgba(0,255,136,0.7); }
-    #live-tick-toggle.active { background: rgba(0,255,136,0.12); border-color: rgba(0,255,136,0.5); color: #00ff88; }
 
     /* ─── Symbol Combo ─────────────────────────────────────── */
     #symbol-input {
@@ -138,9 +150,8 @@
     #symbol-input:focus { border-color: rgba(180,140,255,0.5); }
     #symbol-dropdown { bottom: 100%; margin-bottom: 2px; }
     #symbol-dropdown .sym-item:hover { background: rgba(0,204,255,0.08) !important; }
-    #symbol-dropdown::-webkit-scrollbar { width: 3px; }
-    #symbol-dropdown::-webkit-scrollbar-thumb { background: rgba(0,204,255,0.15); border-radius: 10px; }
     #load-data-btn:hover { background: rgba(0,204,255,0.2); }
+    #data-status.judge { color: rgba(127,214,255,0.8); }
     #data-status {
       font-size: 10px; color: rgba(255,255,255,0.3);
       margin-left: 4px; max-width: 120px; overflow: hidden;
@@ -150,9 +161,63 @@
     #data-status.error { color: rgba(255,68,119,0.6); }
     #data-status.loaded { color: rgba(0,255,136,0.6); }
 
+    /* ─── Interface glow sync (Settings → Interface Glow) ─────
+       One selectable glow color drives the main menu (toolbar), the
+       OakGuard launcher, the advisor bubble and the advisor chat box so
+       all four read as one aligned system. Bottoms share the toolbar's
+       32px baseline. */
+    :root { --dafe-glow: #2dffb3; --glow-vis: 1; }
+    body.glow-sync #toolbar {
+      border-color: var(--dafe-glow) !important;
+      box-shadow: 0 0 calc(22px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(42% * var(--glow-vis)), transparent), inset 0 0 12px color-mix(in srgb, var(--dafe-glow) 10%, transparent) !important;
+    }
+    body.glow-sync #advisor-fab {
+      border-color: var(--dafe-glow); color: var(--dafe-glow);
+      box-shadow: 0 0 calc(22px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(50% * var(--glow-vis)), transparent);
+    }
+    body.glow-sync #advisor-panel {
+      border-color: var(--dafe-glow);
+      box-shadow: 0 0 calc(28px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(35% * var(--glow-vis)), transparent), 0 20px 60px rgba(0,0,0,0.55);
+    }
+    body.glow-sync #set-open-oakguard {
+      border-color: var(--dafe-glow) !important; color: var(--dafe-glow) !important;
+      box-shadow: 0 0 calc(18px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(45% * var(--glow-vis)), transparent) !important;
+    }
+    /* Every dashboard/panel converts to the theme color at the chosen
+       brightness: trading, news, settings, visual editor, regime ribbon,
+       OakScript editor, dashboard widget, active signal models, model inputs,
+       and all editor sub-windows/modals. */
+    body.glow-sync #trading-panel, body.glow-sync #news-box, body.glow-sync #visual-editor-panel,
+    body.glow-sync #settings-panel, body.glow-sync #vp-settings-panel, body.glow-sync #widgets-menu,
+    body.glow-sync #oakscript-editor, body.glow-sync #dafe-dashboard, body.glow-sync #indicator-list,
+    body.glow-sync #age-inputs-panel, body.glow-sync #oakscript-docs, body.glow-sync #oakscript-images,
+    body.glow-sync #oakscript-backtest, body.glow-sync #oakscript-strategy-lab, body.glow-sync #oakscript-ml-lab,
+    body.glow-sync #oakscript-alerts, body.glow-sync #oakguard-window, body.glow-sync .dafe-glow-window {
+      border-color: color-mix(in srgb, var(--dafe-glow) 55%, transparent) !important;
+      box-shadow: 0 0 calc(20px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(30% * var(--glow-vis)), transparent), 0 12px 40px rgba(0,0,0,0.5) !important;
+    }
+    body.glow-sync .pk-section {
+      border-color: color-mix(in srgb, var(--dafe-glow) 40%, transparent) !important;
+      background:
+        radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--dafe-glow) calc(14% * var(--glow-vis)), transparent), transparent 60%),
+        radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--dafe-glow) calc(10% * var(--glow-vis)), transparent), transparent 55%),
+        rgba(8,10,20,0.6) !important;
+    }
+    body.glow-sync .pk-title { color: var(--dafe-glow) !important; }
+    body.glow-sync .pk-select:focus, body.glow-sync .pk-inputs input:focus { border-color: color-mix(in srgb, var(--dafe-glow) 65%, transparent) !important; }
+    body.glow-sync #regime-ribbon { border-bottom-color: color-mix(in srgb, var(--dafe-glow) 30%, transparent) !important; }
+    /* Settings checkbox rows: box and label sit together at the left,
+       never spread apart by the generic space-between label layout. */
+    .settings-section label.check-row { justify-content: flex-start !important; white-space: normal; }
+    .settings-section label.check-row input[type="checkbox"] {
+      flex: 0 0 auto !important; width: 16px !important; height: 16px !important;
+      max-width: 16px !important; margin: 0; padding: 0; accent-color: #b48cff; cursor: pointer;
+    }
+    .settings-section label.check-row span { flex: 1; }
+
     /* ─── Trade Advisor Chat ────────────────────────────────── */
     #advisor-fab {
-      position: fixed; bottom: 90px; right: 24px;
+      position: fixed; bottom: 32px; right: 24px;
       z-index: 9999; width: 52px; height: 52px;
       border-radius: 50%; border: 1px solid rgba(180,140,255,0.5);
       background: linear-gradient(135deg, rgba(180,140,255,0.2), rgba(100,80,200,0.12));
@@ -165,7 +230,7 @@
     #advisor-fab.open { transform: rotate(45deg) scale(1); }
 
     #advisor-panel {
-      position: fixed; bottom: 152px; right: 24px;
+      position: fixed; bottom: 96px; right: 24px;
       z-index: 9998; width: 420px; max-height: 580px;
       border: 1px solid rgba(180,140,255,0.2);
       border-radius: 18px;
@@ -205,8 +270,6 @@
       display: flex; flex-direction: column; gap: 10px;
       min-height: 180px; max-height: 300px;
     }
-    .advisor-messages::-webkit-scrollbar { width: 4px; }
-    .advisor-messages::-webkit-scrollbar-thumb { background: rgba(180,140,255,0.2); border-radius: 10px; }
 
     .advisor-msg {
       max-width: 88%; padding: 9px 12px;
@@ -241,6 +304,13 @@
       align-self: center; background: transparent;
       border: none; color: rgba(255,255,255,0.2);
       font-size: 11px; text-align: center; padding: 4px;
+    }
+    .advisor-msg.demo {
+      align-self: center;
+      background: rgba(127,214,255,0.05);
+      border: 1px solid rgba(127,214,255,0.16);
+      color: rgba(127,214,255,0.8); font-size: 11px;
+      text-align: center;
     }
 
     .msg-copy-btn {
@@ -334,7 +404,7 @@
 
     /* ─── Trading Panel ─────────────────────────────────────── */
     #trading-panel {
-      position: fixed; top: 80px; left: 24px;
+      position: fixed; top: 38px; left: 72px; /* right of the draw-tool rail, below the header bar (see header-band.ts) */
       z-index: 9997; width: 240px; min-width: 220px; min-height: 120px;
       max-width: 480px; max-height: 85vh;
       resize: both; overflow: auto;
@@ -346,7 +416,6 @@
       font-size: 12px; cursor: default;
       transition: opacity .2s;
     }
-    #trading-panel.collapsed .trading-panel-body { display: none; }
     #trading-panel.dragging { opacity: 0.85; }
 
     .trading-panel-header {
@@ -579,17 +648,36 @@
       padding: 16px; overflow-y: auto; display: flex;
       flex-direction: column; gap: 14px;
     }
-    #settings-body::-webkit-scrollbar { width: 4px; }
-    #settings-body::-webkit-scrollbar-thumb { background: rgba(180,140,255,0.2); border-radius: 10px; }
+    /* Every settings section gets the Provider API Keys treatment:
+       gradient-tinted card, cyan title, themed focus states. Under
+       body.glow-sync these convert to the interface glow color. */
     .settings-section {
-      border: 1px solid rgba(180,140,255,0.1);
+      border: 1px solid rgba(0,204,255,0.18);
       border-radius: 10px; padding: 12px;
       display: flex; flex-direction: column; gap: 8px;
+      background:
+        radial-gradient(120% 140% at 0% 0%, rgba(0,204,255,0.08), transparent 60%),
+        radial-gradient(120% 140% at 100% 0%, rgba(180,140,255,0.08), transparent 55%),
+        rgba(8,10,20,0.6);
     }
     .settings-section-title {
-      color: rgba(180,140,255,0.5); font-size: 10px;
-      font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      color: #00ccff; font-size: 11px;
+      font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px;
       margin-bottom: 2px;
+    }
+    .settings-action-btn {
+      width: 100%; padding: 7px 12px; border-radius: 6px; cursor: pointer;
+      font-size: 11px; font-weight: 700; font-family: inherit;
+      border: 1px solid rgba(0,204,255,0.3); background: rgba(0,204,255,0.07); color: #7fdcff;
+      transition: filter .15s ease;
+    }
+    .settings-action-btn:hover { filter: brightness(1.3); }
+    .settings-action-btn.danger { border-color: rgba(255,68,119,0.3); background: rgba(255,68,119,0.06); color: #ff7d9c; }
+    body.glow-sync .settings-section-title { color: var(--dafe-glow); }
+    body.glow-sync .settings-action-btn {
+      border-color: color-mix(in srgb, var(--dafe-glow) 45%, transparent);
+      color: var(--dafe-glow);
+      background: color-mix(in srgb, var(--dafe-glow) 8%, transparent);
     }
     .settings-section label {
       display: flex; align-items: center; justify-content: space-between;
@@ -622,9 +710,69 @@
     }
     #settings-save:hover { background: rgba(0,255,136,0.15); }
 
+    /* ─── Provider API keys ─────────────────────────────────── */
+    .pk-section {
+      position: relative; flex-shrink: 0;
+      border: 1px solid rgba(0,204,255,0.18) !important;
+      background:
+        radial-gradient(120% 140% at 0% 0%, rgba(0,204,255,0.10), transparent 60%),
+        radial-gradient(120% 140% at 100% 0%, rgba(180,140,255,0.10), transparent 55%),
+        rgba(8,10,20,0.6);
+    }
+    .pk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .pk-title { color: #00ccff; font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; }
+    .pk-sub { color: rgba(255,255,255,0.32); font-size: 9.5px; margin-top: 2px; }
+    .pk-sub b { color: rgba(0,255,136,0.8); font-weight: 700; }
+    .pk-refresh {
+      background: none; border: 1px solid rgba(0,204,255,0.22); color: rgba(0,204,255,0.75);
+      width: 24px; height: 24px; border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1;
+    }
+    .pk-refresh:hover { background: rgba(0,204,255,0.1); }
+    .pk-hint { color: rgba(255,255,255,0.34); font-size: 9.5px; line-height: 1.5; }
+    .pk-select {
+      width: 100%; padding: 6px 8px; border: 1px solid rgba(0,204,255,0.22);
+      border-radius: 7px; background: rgba(6,10,18,0.9); color: #dff6ff;
+      font-size: 11px; font-family: inherit; outline: none;
+    }
+    .pk-select:focus { border-color: rgba(0,204,255,0.55); }
+    .pk-card {
+      border: 1px solid rgba(255,255,255,0.07); border-radius: 9px; padding: 9px;
+      background: rgba(4,6,14,0.55); display: flex; flex-direction: column; gap: 7px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .pk-card.connected { border-color: rgba(0,255,136,0.28); box-shadow: inset 0 0 0 1px rgba(0,255,136,0.04); }
+    .pk-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .pk-label { color: #eaf6ff; font-size: 10.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .pk-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .pk-dot.on { background: #00ff88; box-shadow: 0 0 6px rgba(0,255,136,0.8); }
+    .pk-masked { color: rgba(255,255,255,0.28); font-size: 9px; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 58%; text-align: right; }
+    .pk-inputs { display: grid; grid-template-columns: 1fr; gap: 5px; }
+    .pk-inputs input {
+      min-width: 0; padding: 6px 8px; border: 1px solid rgba(0,204,255,0.16);
+      border-radius: 6px; background: rgba(6,10,18,0.85); color: rgba(255,255,255,0.82);
+      font-size: 10.5px; font-family: inherit; outline: none;
+    }
+    .pk-inputs input:focus { border-color: rgba(0,204,255,0.5); }
+    .pk-actions { display: flex; gap: 5px; justify-content: flex-end; }
+    .pk-btn {
+      padding: 6px 9px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.7); font-family: inherit;
+    }
+    .pk-btn.save { border-color: rgba(0,255,136,0.35); background: rgba(0,255,136,0.08); color: #00ff88; }
+    .pk-btn.test { border-color: rgba(0,204,255,0.35); background: rgba(0,204,255,0.08); color: #00ccff; }
+    .pk-btn.clear { border-color: rgba(255,68,119,0.3); background: rgba(255,68,119,0.06); color: #ff4477; }
+    .pk-btn:hover { filter: brightness(1.25); }
+    .pk-btn:disabled { opacity: .45; cursor: default; filter: none; }
+    .pk-status { font-size: 9.5px; color: rgba(255,255,255,0.4); min-height: 11px; }
+    .pk-status.ok { color: #00ff88; }
+    .pk-status.err { color: #ff4477; }
+    .pk-status.wait { color: #ffb800; }
+    .pk-note { font-size: 9px; color: rgba(255,255,255,0.25); line-height: 1.45; }
+
     /* ─── News Box ──────────────────────────────────────────── */
     #news-box {
-      position: fixed; top: 12px; right: 12px;
+      position: fixed; top: 38px; right: 12px;
       z-index: 9995; width: 320px; max-height: 300px;
       border: 1px solid rgba(0,204,255,0.15);
       border-radius: 12px;
@@ -649,8 +797,6 @@
     #news-header button:hover { color: #fff; }
     #news-body { overflow-y: auto; max-height: 260px; min-height: 40px; }
     #news-list { font-size: 11px; color: rgba(255,255,255,0.5); }
-    #news-body::-webkit-scrollbar { width: 3px; }
-    #news-body::-webkit-scrollbar-thumb { background: rgba(0,204,255,0.15); border-radius: 10px; }
     .news-item {
       padding: 7px 10px; border-bottom: 1px solid rgba(0,204,255,0.04);
       cursor: pointer; transition: background 0.1s;
@@ -667,13 +813,51 @@
     }
     .news-tag.earnings { background: rgba(0,255,136,0.1); color: rgba(0,255,136,0.5); }
     .news-tag.risk { background: rgba(255,68,119,0.1); color: rgba(255,68,119,0.5); }
-    #news-body.collapsed { display: none; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-OZQcK03D.js"></script>
+  <style>
+    /* Static boot splash. It covers the terminal from the first painted
+       pixel until the launch overlay mounts, so the chart chrome never
+       flashes before the opener. Once the launch layer exists it removes
+       this node; judge mode removes it before booting the terminal. */
+    #dafe-boot {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background:
+        radial-gradient(120% 90% at 50% 40%, #0a1226 0%, #070c18 48%, #03050c 100%);
+      color: rgba(255,255,255,0.85);
+      font-family: 'Cinzel', Georgia, serif;
+    }
+    #dafe-boot .dafe-boot-word {
+      font-size: 46px; font-weight: 900; letter-spacing: 9px;
+      background: linear-gradient(180deg, #fbe6ab 0%, #e8c368 38%, #c0912f 64%, #7a5416 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    #dafe-boot .dafe-boot-sub {
+      font-size: 10px; letter-spacing: 5.5px;
+      color: rgba(255,232,186,0.42); margin-top: 4px;
+    }
+    #dafe-boot .dafe-boot-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #c0912f; margin-top: 30px;
+      animation: dafeBootPulse 1s ease-in-out infinite alternate;
+    }
+    @keyframes dafeBootPulse {
+      from { opacity: 0.25; transform: scale(0.82); }
+      to   { opacity: 0.95; transform: scale(1.08); }
+    }
+  </style>
+  <script type="module" crossorigin src="./assets/index-CrlYGH6I.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DceYngYD.css">
 </head>
 <body>
+  <div id="dafe-boot" aria-hidden="true">
+    <div class="dafe-boot-word">DAFE</div>
+    <div class="dafe-boot-sub">TRADING SYSTEMS</div>
+    <div class="dafe-boot-dot"></div>
+  </div>
   <div id="chart-container">
     <div id="chart-area">
       <canvas id="canvas-3d"></canvas>
@@ -754,21 +938,103 @@
       <button id="settings-close" title="Close">✕</button>
     </div>
     <div id="settings-body">
-      <div class="settings-section">
-        <div class="settings-section-title">API Credentials</div>
-        <label>Massive API Key <input type="password" id="set-massive-key" placeholder="Enter API key"></label>
-        <label>SerpAPI Key <input type="password" id="set-serp-key" placeholder="Enter API key"></label>
+      <div class="settings-section" id="account-section" style="display:none">
+        <div class="settings-section-title">Account</div>
+        <div id="account-name" style="font-size:12px;color:rgba(255,255,255,0.78);margin-bottom:3px;"></div>
+        <div id="account-since" style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:10px;"></div>
+        <div class="account-profiles-head">Profiles on this device</div>
+        <div id="account-profiles" class="account-profiles"></div>
+        <button id="account-signout" style="padding:7px 14px;border:1px solid rgba(255,68,119,0.35);border-radius:6px;background:rgba(255,68,119,0.08);color:rgba(255,140,170,0.9);font-family:inherit;font-size:10px;font-weight:700;letter-spacing:0.6px;cursor:pointer;margin-top:10px;">SIGN OUT</button>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;margin-top:8px;">Signing out returns to the painted sign-in screen. Delete a profile to remove it from this device permanently.</div>
       </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Brokerage — Tradovate</div>
-        <label>Username <input type="text" id="set-tradovate-user" placeholder="Tradovate username"></label>
-        <label>Password <input type="password" id="set-tradovate-pass" placeholder="Tradovate password"></label>
-        <label>Environment
-          <select id="set-tradovate-env">
-            <option value="demo">Demo</option>
-            <option value="live">Live</option>
-          </select>
-        </label>
+      <div class="settings-section pk-section themed-section">
+        <div class="pk-head">
+          <div>
+            <div class="pk-title">API Credentials</div>
+            <div class="pk-sub">keys encrypted on this machine</div>
+          </div>
+        </div>
+        <div class="pk-card">
+          <label>API Key <input type="password" id="set-massive-key" placeholder="Enter API key"></label>
+          <label>SerpAPI Key <input type="password" id="set-serp-key" placeholder="Enter API key"></label>
+        </div>
+      </div>
+      <div class="settings-section pk-section themed-section">
+        <div class="pk-head">
+          <div>
+            <div class="pk-title">Brokerage — Tradovate</div>
+            <div class="pk-sub">paper default · demo unless you switch to live</div>
+          </div>
+        </div>
+        <div class="pk-card">
+          <label>Username <input type="text" id="set-tradovate-user" placeholder="Tradovate username"></label>
+          <label>Password <input type="password" id="set-tradovate-pass" placeholder="Tradovate password"></label>
+          <label>Environment
+            <select id="set-tradovate-env">
+              <option value="demo">Demo</option>
+              <option value="live">Live</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="settings-section pk-section themed-section">
+        <div class="pk-head">
+          <div>
+            <div class="pk-title">Universal Data Providers</div>
+            <div class="pk-sub">one adapter converts every feed to internal bars</div>
+          </div>
+          <button id="dp-refresh" class="pk-refresh" title="Refresh providers">⟳</button>
+        </div>
+        <div class="pk-hint">Connect ANY market-data provider. Presets know their response shape; Custom REST takes a URL template + field mapping. Save, Test (fetches real SPY bars through the adapter), then pick it under Data → Source.</div>
+        <select id="dp-provider" class="pk-select"></select>
+        <div class="pk-card">
+          <div class="pk-row-top">
+            <span class="pk-label"><span id="dp-dot" class="pk-dot"></span><span id="dp-label">Yahoo Finance (free)</span></span>
+            <span id="dp-masked" class="pk-masked">no key needed</span>
+          </div>
+          <div class="pk-inputs">
+            <input id="dp-key" type="password" placeholder="Paste API key (Alpaca: KEY_ID:SECRET)" autocomplete="off" spellcheck="false">
+            <input id="dp-url" type="text" placeholder="Base URL (optional override)" spellcheck="false">
+            <input id="dp-template" type="text" placeholder="Custom only: https://…/bars?symbol={symbol}&interval={interval}&from={fromISO}&to={toISO}&apikey={apiKey}" spellcheck="false">
+            <input id="dp-bars-path" type="text" placeholder="Custom only: bars path in JSON (e.g. results or data.bars)" spellcheck="false">
+            <input id="dp-fields" type="text" placeholder='Custom only: field map JSON {"ts":"t","ts_unit":"ms","open":"o","high":"h","low":"l","close":"c","volume":"v"}' spellcheck="false">
+            <div class="pk-actions">
+              <button id="dp-save" class="pk-btn save">Save</button>
+              <button id="dp-test" class="pk-btn test">Test</button>
+              <button id="dp-clear" class="pk-btn clear" title="Remove key">✕</button>
+            </div>
+          </div>
+          <div id="dp-status" class="pk-status"></div>
+          <div id="dp-note" class="pk-note"></div>
+        </div>
+      </div>
+      <div class="settings-section pk-section">
+        <div class="pk-head">
+          <div>
+            <div class="pk-title">Provider API Keys</div>
+            <div class="pk-sub">keys encrypted on this machine</div>
+          </div>
+          <button id="pk-refresh" class="pk-refresh" title="Refresh providers">⟳</button>
+        </div>
+        <div class="pk-hint">Run the advisor and the OakScript coder on a hosted model when local hosting is too heavy. Save a key, test it, then choose the provider below.</div>
+        <select id="pk-provider" class="pk-select"></select>
+        <div id="pk-card" class="pk-card">
+          <div class="pk-row-top">
+            <span class="pk-label"><span id="pk-dot" class="pk-dot"></span><span id="pk-label">OpenCode</span></span>
+            <span id="pk-masked" class="pk-masked">no key</span>
+          </div>
+          <div class="pk-inputs">
+            <input id="pk-key" type="password" placeholder="Paste API key" autocomplete="off" spellcheck="false">
+            <input id="pk-url" type="text" placeholder="https://…/v1" spellcheck="false">
+            <div class="pk-actions">
+              <button id="pk-save" class="pk-btn save">Save</button>
+              <button id="pk-test" class="pk-btn test">Test</button>
+              <button id="pk-clear" class="pk-btn clear" title="Remove key">✕</button>
+            </div>
+          </div>
+          <div id="pk-status" class="pk-status"></div>
+          <div id="pk-note" class="pk-note"></div>
+        </div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">LLM Configuration</div>
@@ -777,6 +1043,16 @@
             <option value="local">Local (this GPU / llama.cpp)</option>
             <option value="ollama">Ollama Local (daemon on this machine)</option>
             <option value="ollama-cloud">Ollama Cloud (signed-in cloud models)</option>
+            <optgroup label="Hosted — API key">
+              <option value="meta">Meta Model API (Muse Spark / Wonder)</option>
+              <option value="opencode">OpenCode</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="orcarouter">OrcaRouter</option>
+              <option value="nvidia">NVIDIA NIM</option>
+              <option value="custom">Custom endpoint</option>
+            </optgroup>
           </select>
         </label>
         <label>Ollama URL <input type="text" id="set-ollama-url" placeholder="http://localhost:11434"></label>
@@ -786,11 +1062,24 @@
         <label id="advisor-model-cloud-row" style="display:none">Ollama Advisor Model
           <select id="set-advisor-model-cloud"><option value="">(loading Ollama models…)</option></select>
         </label>
+        <label id="advisor-model-hosted-row" style="display:none">Hosted Advisor Model
+          <select id="set-advisor-model-hosted"><option value="">(loading models…)</option></select>
+        </label>
         <label>OakScript Coder Provider
           <select id="set-coder-provider">
             <option value="local">Local (this GPU)</option>
             <option value="ollama">Ollama Local (daemon on this machine)</option>
             <option value="ollama-cloud">Ollama Cloud (signed-in cloud models)</option>
+            <optgroup label="Hosted — API key">
+              <option value="meta">Meta Model API (Muse Spark / Wonder)</option>
+              <option value="opencode">OpenCode</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="orcarouter">OrcaRouter</option>
+              <option value="nvidia">NVIDIA NIM</option>
+              <option value="custom">Custom endpoint</option>
+            </optgroup>
           </select>
         </label>
         <label id="coder-model-local-row">OakScript Coder Model
@@ -799,6 +1088,9 @@
         <label id="coder-model-cloud-row" style="display:none">Ollama Coder Model
           <select id="set-coder-model-cloud"><option value="">(loading Ollama models…)</option></select>
         </label>
+        <label id="coder-model-hosted-row" style="display:none">Hosted Coder Model
+          <select id="set-coder-model-hosted"><option value="">(loading models…)</option></select>
+        </label>
         <div id="set-coder-info" style="color:rgba(180,140,255,0.4);font-size:9px;margin-top:2px;line-height:1.4;">
           Ollama Local runs models pulled onto this machine via the Ollama daemon; Ollama Cloud runs large off-device models (e.g. qwen3-coder:480b-cloud) — far better at OakScript than what fits in 8GB. Install Ollama, run <b>ollama signin</b> for cloud, then pick a model above. The agent is auto-fed the OakScript documentation.
         </div>
@@ -806,10 +1098,11 @@
           <input type="checkbox" id="set-model-auto" style="width:auto;">
           <span>Auto-select best model (off = use my choice above)</span>
         </label>
-        <button id="set-switch-model" style="width:100%;margin-top:6px;padding:6px;border:1px solid rgba(180,140,255,0.3);border-radius:5px;background:rgba(180,140,255,0.08);color:#b48cff;cursor:pointer;font-size:11px;font-weight:600;">🔄 Switch Model Now (hot reload)</button>
+        <button id="set-switch-model" class="settings-action-btn" style="margin-top:6px;">🔄 Switch Model Now (hot reload)</button>
         <div id="set-switch-status" style="color:rgba(255,184,0,0.7);font-size:9px;margin-top:2px;display:none;"></div>
         <label>Advisor Voice
           <select id="set-voice">
+            <option value="off" selected>Off — no spoken replies</option>
             <option value="auto">Auto (best available)</option>
             <option value="natural">Natural / Neural</option>
             <option value="male">Male</option>
@@ -823,15 +1116,14 @@
         <div class="settings-section-title">Data</div>
         <label>Source
           <select id="set-data-source">
-            <option value="hybrid">⚡ Hybrid (Massive + Yahoo + Synthetic)</option>
-            <option value="massive">Massive (primary)</option>
-            <option value="yahoo">Yahoo Finance (fallback)</option>
+            <option value="yahoo">Yahoo Finance (free)</option>
+            <option value="massive">Massive / Polygon</option>
+            <option value="polygon">Polygon.io (adapter)</option>
+            <option value="alpaca">Alpaca (adapter)</option>
+            <option value="twelvedata">Twelve Data (adapter)</option>
+            <option value="custom">Custom REST (adapter)</option>
           </select>
         </label>
-        <div id="set-hybrid-info" style="color:rgba(180,140,255,0.4);font-size:9px;margin-top:3px;line-height:1.4;">
-          Hybrid blends paid Massive anchors (sparse) with free Yahoo corrections
-          and a correction-anchored synthetic engine for near-live accuracy at low cost.
-        </div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Paper Trading</div>
@@ -865,33 +1157,57 @@
           <input type="checkbox" id="set-trade-hide-markers" style="width:auto;">
           <span>Hide execution markers on chart</span>
         </label>
-        <button id="set-trade-clear" style="width:100%;margin-top:8px;padding:6px 12px;border:1px solid rgba(255,68,119,0.25);border-radius:5px;background:rgba(255,68,119,0.08);color:#ff4477;cursor:pointer;font-size:11px;">Clear Trade History (start fresh)</button>
+        <button id="set-trade-clear" class="settings-action-btn danger" style="margin-top:8px;">Clear Trade History (start fresh)</button>
         <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">Resets cash, positions, and open orders back to a fresh account. Chart execution markers are kept.</div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Signal Analysis Models</div>
-        <button id="set-open-editor" style="width:100%;padding:6px 12px;border:1px solid rgba(180,140,255,0.2);border-radius:5px;background:rgba(180,140,255,0.08);color:#b48cff;cursor:pointer;font-size:11px;">Open OakScript Editor</button>
+        <button id="set-open-editor" class="settings-action-btn">Open OakScript Editor</button>
+        <button id="set-open-oakguard" class="settings-action-btn" style="margin-top:6px;">⬢ OAKGUARD — Muse Wonder writes the rules, a referee decides <span title="Built during the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026)" style="display:inline-block;margin-left:5px;padding:0 4px;border-radius:3px;background:#ffd166;color:#0b0c1d;font-size:8px;font-weight:700;letter-spacing:0.06em;line-height:13px;vertical-align:middle;">NEW</span></button>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px;line-height:1.4;">OakGuard: when code passes the validator but breaks at runtime, Muse Wonder writes a declarative rule that would have caught it. An independent referee tests it against broken variants (some held out) and known-good scripts, and promotes only rules that pass every gate. Promoted rules enforce live in the editor validator. Without a backend, OakGuard replays a recorded Muse Wonder run.</div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Audit Trail</div>
-        <button id="set-open-ledger" style="width:100%;padding:6px 12px;border:1px solid rgba(180,140,255,0.2);border-radius:5px;background:rgba(180,140,255,0.08);color:#b48cff;cursor:pointer;font-size:11px;">🔗 View Glass Ledger</button>
+        <button id="set-open-ledger" class="settings-action-btn">🔗 View Glass Ledger</button>
         <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">A tamper-evident, hash-chained record of trade fills and signal model saves/deletes.</div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Storyboard</div>
-        <button id="set-open-storyboard" style="width:100%;padding:6px 12px;border:1px solid rgba(180,140,255,0.2);border-radius:5px;background:rgba(180,140,255,0.08);color:#b48cff;cursor:pointer;font-size:11px;">📖 View Storyboard</button>
+        <button id="set-open-storyboard" class="settings-action-btn">📖 View Storyboard</button>
         <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">A chronological log of noteworthy moments — pin your own notes, or let fired alerts pin themselves.</div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Accessibility</div>
-        <label style="display:flex;align-items:center;gap:6px;">
-          <input type="checkbox" id="set-accessible-palette" style="width:auto;">
+
+        <label style="margin-bottom:6px;">Time axis clock
+          <select id="set-hour-cycle" style="flex:0 0 auto;width:172px;">
+            <option value="12">Standard — 12-hour (1:00)</option>
+            <option value="24">Military — 24-hour (13:00)</option>
+          </select>
+        </label>
+
+        <label class="check-row">
+          <input type="checkbox" id="set-accessible-palette">
           <span>Colorblind-safe signal palette (blue/orange instead of green/red for buy/sell and alerts)</span>
         </label>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
-          <input type="checkbox" id="set-sonification" style="width:auto;">
+        <label class="check-row" style="margin-top:6px;">
+          <input type="checkbox" id="set-sonification">
           <span>🔊 Sound cues for alerts and trade fills</span>
         </label>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Interface Glow</div>
+        <label class="check-row">
+          <input type="checkbox" id="set-glow-enabled" checked>
+          <span>Sync one glow color across the main menu, advisor bubble/chat, trading/news panels, settings sections and dashboards</span>
+        </label>
+        <label style="margin-top:6px;">Glow color
+          <input type="color" id="set-glow-color" value="#2dffb3" style="flex:0 0 auto;width:52px;height:26px;padding:0;cursor:pointer;">
+        </label>
+        <label style="margin-top:6px;">Glow brightness <span id="glow-brightness-val" style="color:#9be8ff;">100%</span>
+          <input type="range" id="set-glow-brightness" min="20" max="160" step="5" value="100" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;">Theme applies to: main menu, OakGuard, advisor, trading panel, news, settings sections, visual editor and dashboards. Brightness controls how visible the glow is everywhere.</div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Display</div>
@@ -903,23 +1219,52 @@
             <option value="plain">Plain</option>
           </select>
         </label>
+        <div class="settings-section-title" style="margin-top:10px;">Signal Markers</div>
+        <label>Marker size <span id="set-signal-size-val" style="color:#9be8ff;">1.00×</span>
+          <input type="range" id="set-signal-size" min="0.4" max="2.5" step="0.05" value="1" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <label>Marker brightness <span id="set-signal-bright-val" style="color:#9be8ff;">80%</span>
+          <input type="range" id="set-signal-bright" min="20" max="180" step="5" value="80" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <label>Marker offset <span id="set-signal-offset-val" style="color:#9be8ff;">1.00×</span>
+          <input type="range" id="set-signal-offset" min="0" max="3" step="0.05" value="1" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <label>Marker style
+          <select id="set-signal-style">
+            <option value="arrows">Arrows — directional cones</option>
+            <option value="orbs">Orbs — soft glowing spheres</option>
+            <option value="diamonds">Diamonds — faceted gems</option>
+          </select>
+        </label>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;">Buy/sell markers on the main chart and their 3D cones. Turn brightness down to calm an over-bright signal; offset sets how far markers sit from the bar (0 = on the bar). Size, offset and style apply to every model at once.</div>
+        <div class="settings-section-title" style="margin-top:10px;">3D Scene</div>
+        <label>Scene exposure <span id="set-3d-exposure-val" style="color:#9be8ff;">1.45</span>
+          <input type="range" id="set-3d-exposure" min="0.4" max="2.4" step="0.05" value="1.45" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <label>Bar brightness <span id="set-3d-bars-val" style="color:#9be8ff;">1.35</span>
+          <input type="range" id="set-3d-bars" min="0.3" max="2.4" step="0.05" value="1.35" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <label>Background brightness <span id="set-3d-bg-val" style="color:#9be8ff;">1.00</span>
+          <input type="range" id="set-3d-bg" min="0" max="2.2" step="0.05" value="1" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;">Applies to the 3D main chart and the 3D lower deck together. Exposure lifts the whole scene; bar brightness targets the candles; background brightness changes the deep-space base.</div>
       <div class="settings-section">
-        <div class="settings-section-title">Hotkeys (Numpad)</div>
+        <div class="settings-section-title">Hotkeys (Numpad, fixed)</div>
         <div class="hotkey-grid">
-          <label>3D Mode <input type="text" id="hk-3d" value="Numpad0" class="hotkey-input"></label>
-          <label>Volume Profile <input type="text" id="hk-vp" value="Numpad1" class="hotkey-input"></label>
-          <label>Model Editor <input type="text" id="hk-oak" value="Numpad2" class="hotkey-input"></label>
-          <label>Frame All <input type="text" id="hk-frame" value="Numpad3" class="hotkey-input"></label>
-          <label>Trend Line <input type="text" id="hk-trend" value="Numpad4" class="hotkey-input"></label>
-          <label>Horizontal <input type="text" id="hk-hline" value="Numpad5" class="hotkey-input"></label>
-          <label>Ray <input type="text" id="hk-ray" value="Numpad6" class="hotkey-input"></label>
-          <label>Rectangle <input type="text" id="hk-rect" value="Numpad7" class="hotkey-input"></label>
-          <label>Fib Retrace <input type="text" id="hk-fib" value="Numpad8" class="hotkey-input"></label>
-          <label>Channel <input type="text" id="hk-channel" value="Numpad9" class="hotkey-input"></label>
-          <label>Text Label <input type="text" id="hk-text" value="NumpadAdd" class="hotkey-input"></label>
-          <label>Undo Drawing <input type="text" id="hk-undo" value="NumpadSubtract" class="hotkey-input"></label>
-          <label>Clear All <input type="text" id="hk-clear" value="NumpadMultiply" class="hotkey-input"></label>
-          <label>Deselect <input type="text" id="hk-deselect" value="NumpadDecimal" class="hotkey-input"></label>
+          <label>3D Mode <input type="text" id="hk-3d" value="Numpad0" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Volume Profile <input type="text" id="hk-vp" value="Numpad1" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Model Editor <input type="text" id="hk-oak" value="Numpad2" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Frame All <input type="text" id="hk-frame" value="Numpad3" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Trend Line <input type="text" id="hk-trend" value="Numpad4" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Horizontal <input type="text" id="hk-hline" value="Numpad5" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Ray <input type="text" id="hk-ray" value="Numpad6" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Rectangle <input type="text" id="hk-rect" value="Numpad7" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Fib Retrace <input type="text" id="hk-fib" value="Numpad8" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Channel <input type="text" id="hk-channel" value="Numpad9" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Text Label <input type="text" id="hk-text" value="NumpadAdd" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Undo Drawing <input type="text" id="hk-undo" value="NumpadSubtract" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Clear All <input type="text" id="hk-clear" value="NumpadMultiply" class="hotkey-input" disabled title="Fixed numpad key"></label>
+          <label>Deselect <input type="text" id="hk-deselect" value="NumpadDecimal" class="hotkey-input" disabled title="Fixed numpad key"></label>
     </div>
     </div>
   </div>
@@ -933,7 +1278,7 @@
     <div id="news-header">
       <span>📰 News &amp; Events</span>
       <div class="news-header-buttons">
-        <button id="news-toggle" title="Collapse">−</button>
+        <button id="news-toggle" title="Minimize">−</button>
         <button id="news-close" title="Close">✕</button>
       </div>
     </div>
@@ -944,15 +1289,16 @@
 
   <!-- Drawing Tools Rail -->
   <div id="draw-rail">
-    <button class="draw-btn" data-tool="none" title="Cursor (Esc)">⌖<span class="tooltip">Cursor · Esc</span></button>
-    <button class="draw-btn" data-tool="trend" title="Trend Line (T)">╱<span class="tooltip">Trend Line · T</span></button>
-    <button class="draw-btn" data-tool="ray" title="Ray (R)">➚<span class="tooltip">Ray · R</span></button>
-    <button class="draw-btn" data-tool="hline" title="Horizontal Line (H)">―<span class="tooltip">Horizontal · H</span></button>
-    <button class="draw-btn" data-tool="rect" title="Rectangle (B)">▭<span class="tooltip">Rectangle · B</span></button>
-    <button class="draw-btn" data-tool="fib" title="Fib Retracement (G)">𝆑<span class="tooltip">Fib · G</span></button>
-    <button class="draw-btn" data-tool="channel" title="Channel (C)">∥<span class="tooltip">Channel · C</span></button>
-    <button class="draw-btn" data-tool="text" title="Text Label (X)">T<span class="tooltip">Text · X</span></button>
-    <button class="draw-btn" id="draw-clear" title="Clear All (Shift+X)">🗑<span class="tooltip">Clear · Shift+X</span></button>
+    <button class="draw-btn" data-tool="none">⌖<span class="tooltip">Cursor · click to select, Delete removes · Esc</span></button>
+    <button class="draw-btn" data-tool="trend">╱<span class="tooltip">Trend line · Numpad 4</span></button>
+    <button class="draw-btn" data-tool="ray">➚<span class="tooltip">Ray · Numpad 6</span></button>
+    <button class="draw-btn" data-tool="hline">―<span class="tooltip">Horizontal · Numpad 5</span></button>
+    <button class="draw-btn" data-tool="rect">▭<span class="tooltip">Rectangle · Numpad 7</span></button>
+    <button class="draw-btn" data-tool="fib">𝆑<span class="tooltip">Fib · Numpad 8</span></button>
+    <button class="draw-btn" data-tool="channel">∥<span class="tooltip">Channel · Numpad 9</span></button>
+    <button class="draw-btn" data-tool="text">T<span class="tooltip">Text · Numpad +</span></button>
+    <button class="draw-btn" data-tool="erase">⌫<span class="tooltip">Eraser · click a drawing · Numpad /</span></button>
+    <button class="draw-btn" id="draw-clear">🗑<span class="tooltip">Clear all · Numpad *</span></button>
   </div>
 
   <!-- Trade Advisor FAB -->
@@ -993,7 +1339,7 @@
     <div class="trading-panel-header" id="tradingPanelHeader">
       <span class="trading-panel-title">Trading</span>
       <div class="trading-panel-header-buttons">
-        <button class="trading-panel-collapse" id="tradingPanelCollapse">−</button>
+        <button class="trading-panel-collapse" id="tradingPanelCollapse" title="Minimize">−</button>
         <button class="trading-panel-collapse" id="tradingPanelClose" title="Close">✕</button>
       </div>
     </div>
@@ -1130,20 +1476,28 @@
       <option value="1w">1w</option>
     </select>
 
+    <select id="pane-dominance" title="Visual dominance when main + lower both present">
+      <option value="both" selected>Both (Main over Lower)</option>
+      <option value="main">Main Only</option>
+      <option value="lower">Lower Only</option>
+    </select>
+
     <div class="sep"></div>
 
     <button id="mode-toggle" style="display:none">2D <span class="key-hint">Np0</span></button>
     <select id="indicator-select" title="Load Signal Analysis Model" style="width:110px;padding:2px 4px;font-size:10px;background:rgba(12,12,28,0.9);color:rgba(255,255,255,0.7);border:1px solid rgba(180,140,255,0.15);border-radius:4px;cursor:pointer;">
       <option value="" disabled selected>📊 Signal Models</option>
     </select>
+    <button id="os-open-editor" title="OakScript Editor — write, backtest and apply signal models">⌘ Editor</button>
     <button id="vp-toggle">VP <span class="key-hint">Np1</span></button>
     <button id="regime-toggle" title="Toggle the Regime Ribbon (advisory market-state strip at the top of the chart)">◉ Regime</button>
     <div id="widgets-combo" style="position:relative;display:inline-block">
       <button id="widgets-toggle" title="Show or hide widgets">▤ Widgets</button>
       <div id="widgets-menu" style="display:none;position:absolute;right:0;bottom:100%;margin-bottom:2px;background:rgba(10,10,25,0.96);border:1px solid rgba(180,140,255,0.2);border-radius:6px;z-index:9999;font-size:11px;min-width:170px;padding:4px 0;"></div>
     </div>
-    <button id="live-tick-toggle" title="Live tick simulation">◆ Live</button>
+    <button id="auto-refresh-toggle" title="Auto-refresh (off): reload bars from the selected data source every 30 s">◷ Auto</button>
     <button id="chart-reset" title="Reset chart view (zoom, pan, scale)">⟳ Reset</button>
+    <button id="lower-frame-btn" title="Frame All — recentre the 3D lower deck on the whole instrument">⛶ Frame</button>
     <button id="settings-toggle" title="Settings">⚙</button>
     <button id="toolbar-collapse" title="Collapse toolbar">▲</button>
     <select id="perf-select" title="Performance mode">
