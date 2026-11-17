@@ -849,7 +849,7 @@
       to   { opacity: 0.95; transform: scale(1.08); }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-DoUgEMsV.js"></script>
+  <script type="module" crossorigin src="./assets/index-wZk64Dcp.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-BxM2tVh5.css">
 </head>
 <body>
@@ -1095,6 +1095,44 @@
         <div id="set-coder-info" style="color:rgba(180,140,255,0.4);font-size:9px;margin-top:2px;line-height:1.4;">
           Ollama Local runs models pulled onto this machine via the Ollama daemon; Ollama Cloud runs large off-device models (e.g. qwen3-coder:480b-cloud) — far better at OakScript than what fits in 8GB. Install Ollama, run <b>ollama signin</b> for cloud, then pick a model above. The agent is auto-fed the OakScript documentation.
         </div>
+        <label>Voice Transcription Provider
+          <select id="set-transcribe-provider">
+            <option value="">Auto (Meta if configured, else the editor's provider)</option>
+            <option value="meta">Meta — Muse Voice Transcribe</option>
+            <option value="openai">OpenAI — whisper-1</option>
+            <option value="openrouter">OpenRouter (audio-capable gateway)</option>
+            <option value="orcarouter">OrcaRouter</option>
+            <option value="nvidia">NVIDIA NIM</option>
+            <option value="opencode">OpenCode</option>
+            <option value="custom">Custom endpoint</option>
+            <option value="off">Off — no voice input</option>
+          </select>
+        </label>
+        <label>Voice Transcription Model
+          <input type="text" id="set-transcribe-model" placeholder="whisper-1" autocomplete="off">
+        </label>
+        <div style="color:rgba(180,140,255,0.4);font-size:9px;margin-top:2px;line-height:1.4;">
+          Any OpenAI-compatible <code>/audio/transcriptions</code> endpoint works — leave the model blank to use the provider's default. Anthropic has no audio endpoint, so it is never picked automatically.
+        </div>
+        <label>Token Pricing — provider
+          <select id="set-pricing-provider">
+            <option value="meta">Meta Model API</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="nvidia">NVIDIA NIM</option>
+            <option value="opencode">OpenCode</option>
+            <option value="orcarouter">OrcaRouter</option>
+            <option value="custom">Custom endpoint</option>
+          </select>
+        </label>
+        <div style="display:flex;gap:6px;">
+          <label style="flex:1">Input $/1M tokens <input type="number" step="0.01" min="0" id="set-price-input" placeholder="unknown" autocomplete="off"></label>
+          <label style="flex:1">Output $/1M tokens <input type="number" step="0.01" min="0" id="set-price-output" placeholder="unknown" autocomplete="off"></label>
+        </div>
+        <div style="color:rgba(180,140,255,0.4);font-size:9px;margin-top:2px;line-height:1.4;">
+          Used for the cost column in OakGuard and in model call logs. Leave both blank to keep the price as unknown, which renders as “—” rather than a made-up $0.00. Published prices for Meta, OpenAI and Anthropic models are applied automatically.
+        </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
           <input type="checkbox" id="set-model-auto" style="width:auto;">
           <span>Auto-select best model (off = use my choice above)</span>
@@ -1164,8 +1202,8 @@
       <div class="settings-section">
         <div class="settings-section-title">Signal Analysis Models</div>
         <button id="set-open-editor" class="settings-action-btn">Open OakScript Editor</button>
-        <button id="set-open-oakguard" class="settings-action-btn" style="margin-top:6px;">⬢ OAKGUARD — Muse Wonder writes the rules, a referee decides <span title="Built during the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026)" style="display:inline-block;margin-left:5px;padding:0 4px;border-radius:3px;background:#ffd166;color:#0b0c1d;font-size:8px;font-weight:700;letter-spacing:0.06em;line-height:13px;vertical-align:middle;">NEW</span></button>
-        <div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px;line-height:1.4;">OakGuard: when code passes the validator but breaks at runtime, Muse Wonder writes a declarative rule that would have caught it. An independent referee tests it against broken variants (some held out) and known-good scripts, and promotes only rules that pass every gate. Promoted rules enforce live in the editor validator. Without a backend, OakGuard replays a recorded Muse Wonder run.</div>
+        <button id="set-open-oakguard" class="settings-action-btn" style="margin-top:6px;">⬢ OAKGUARD — the editor model writes the rules, a referee decides</button>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px;line-height:1.4;">OakGuard: when code passes the validator but breaks at runtime, the model you selected for the editor writes a declarative rule that would have caught it. An independent referee tests it against broken variants (some held out) and known-good scripts, and promotes only rules that pass every gate. Promoted rules enforce live in the editor validator. Without a backend, OakGuard replays a recorded run.</div>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">Audit Trail</div>
