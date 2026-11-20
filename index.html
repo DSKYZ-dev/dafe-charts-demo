@@ -120,6 +120,12 @@
     #toolbar .label {
       color: rgba(255,255,255,0.25); font-size: 11px;
     }
+    #toolbar .dafe-wordmark {
+      color: #00ff88 !important;
+      font-weight: 900 !important;
+      letter-spacing: 0.14em;
+      text-shadow: 0 0 12px rgba(0,255,136,0.28);
+    }
     .key-hint { font-size: 9px; color: rgba(255,255,255,0.2); margin-left: 3px; }
 
     #settings-toggle {
@@ -175,9 +181,13 @@
       border-color: var(--dafe-glow); color: var(--dafe-glow);
       box-shadow: 0 0 calc(22px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(50% * var(--glow-vis)), transparent);
     }
+    /* The advisor window must glow exactly like the other widget windows.
+       ui-chrome.css declares a box-shadow with !important, so these declarations
+       need !important too — otherwise the shared HUD shadow silently wins and
+       the advisor is the one panel left without the themed glow. */
     body.glow-sync #advisor-panel {
-      border-color: var(--dafe-glow);
-      box-shadow: 0 0 calc(28px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(35% * var(--glow-vis)), transparent), 0 20px 60px rgba(0,0,0,0.55);
+      border-color: color-mix(in srgb, var(--dafe-glow) 55%, transparent) !important;
+      box-shadow: 0 0 calc(20px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(30% * var(--glow-vis)), transparent), 0 20px 60px rgba(0,0,0,0.55) !important;
     }
     body.glow-sync #set-open-oakguard {
       border-color: var(--dafe-glow) !important; color: var(--dafe-glow) !important;
@@ -195,6 +205,30 @@
     body.glow-sync #oakscript-alerts, body.glow-sync #oakguard-window, body.glow-sync .dafe-glow-window {
       border-color: color-mix(in srgb, var(--dafe-glow) 55%, transparent) !important;
       box-shadow: 0 0 calc(20px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(30% * var(--glow-vis)), transparent), 0 12px 40px rgba(0,0,0,0.5) !important;
+    }
+    /* The drawing rail and every minimized-window tab ride the SAME master glow
+       as the trading panel, always 30% lighter: 70% of its blur and colour
+       strength (20px→14px, 30%→21%, 55%→38.5%) at whatever brightness the
+       master slider is set to. */
+    body.glow-sync #draw-rail,
+    body.glow-sync .window-dock-tab {
+      border-color: color-mix(in srgb, var(--dafe-glow) calc(38.5% * var(--glow-vis)), transparent) !important;
+      box-shadow: 0 0 calc(14px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(21% * var(--glow-vis)), transparent), 0 12px 40px rgba(0,0,0,0.5) !important;
+    }
+    body.glow-sync .window-dock-close {
+      border-color: color-mix(in srgb, var(--dafe-glow) calc(28% * var(--glow-vis)), transparent) !important;
+      color: color-mix(in srgb, var(--dafe-glow) calc(60% * var(--glow-vis)), transparent) !important;
+    }
+    /* Top header controls: regime dot/label, the model dropdown and the
+       icon-only reset. Always exactly 50% of the master glow at any brightness
+       (20px→10px, 30%→15%, 55%→27.5%). */
+    body.glow-sync #regime-visual-toggle,
+    body.glow-sync #regime-suggest-method,
+    body.glow-sync #regime-reset-view {
+      border-color: color-mix(in srgb, var(--dafe-glow) calc(27.5% * var(--glow-vis)), transparent) !important;
+      box-shadow: 0 0 calc(10px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(15% * var(--glow-vis)), transparent) !important;
+      color: color-mix(in srgb, var(--dafe-glow) calc(85% * var(--glow-vis)), #ffffff) !important;
+      text-shadow: 0 0 calc(6px * var(--glow-vis)) color-mix(in srgb, var(--dafe-glow) calc(25% * var(--glow-vis)), transparent);
     }
     body.glow-sync .pk-section {
       border-color: color-mix(in srgb, var(--dafe-glow) 40%, transparent) !important;
@@ -407,7 +441,7 @@
       position: fixed; top: 38px; left: 72px; /* right of the draw-tool rail, below the header bar (see header-band.ts) */
       z-index: 9997; width: 240px; min-width: 220px; min-height: 120px;
       max-width: 480px; max-height: 85vh;
-      resize: both; overflow: auto;
+      overflow: hidden; /* custom corner grips replace the native resize grapple */
       border: 1px solid rgba(0,204,255,0.2);
       border-radius: 12px;
       background: linear-gradient(180deg, rgba(10,10,20,0.95), rgba(13,13,26,0.95));
@@ -546,13 +580,18 @@
     .trade-account-line .val.neg { color: #ff4477; }
     .trade-fill-note { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 6px; line-height: 1.4; }
 
-    .vpi-settings {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 10px; color: rgba(255,255,255,0.35);
+    /* VPI lives inside the Volume Profile panel now — same row rhythm as the
+       other 3D input options, with the checkbox sitting immediately after. */
+    #vp-settings-panel label.vp-vpi-row {
+      gap: 8px; cursor: pointer;
+      padding: 6px 8px; margin-top: -2px;
+      border: 1px solid rgba(180,140,255,0.16);
+      border-radius: 6px;
+      background: linear-gradient(90deg, rgba(180,140,255,0.09), rgba(124,232,255,0.03));
     }
-    .vpi-settings input[type="checkbox"] {
-      accent-color: #b48cff;
-    }
+    #vp-settings-panel label.vp-vpi-row input[type="checkbox"] { accent-color: #b48cff; width: 14px; height: 14px; flex: 0 0 auto; }
+    #vp-settings-panel label.vp-vpi-row .vp-vpi-label { color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 0.04em; }
+    #vp-settings-panel label.vp-vpi-row small { color: rgba(255,255,255,0.35); font-weight: 400; font-size: 9px; margin-left: 4px; }
 
     #vp-settings-panel {
       position: fixed; right: 12px; bottom: 52px; top: auto;
@@ -795,7 +834,7 @@
       cursor: pointer; font-size: 14px; padding: 0 2px;
     }
     #news-header button:hover { color: #fff; }
-    #news-body { overflow-y: auto; max-height: 260px; min-height: 40px; }
+    #news-body { flex: 1 1 auto; min-height: 40px; overflow-y: auto; }
     #news-list { font-size: 11px; color: rgba(255,255,255,0.5); }
     .news-item {
       padding: 7px 10px; border-bottom: 1px solid rgba(0,204,255,0.04);
@@ -849,8 +888,8 @@
       to   { opacity: 0.95; transform: scale(1.08); }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-wZk64Dcp.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BxM2tVh5.css">
+  <script type="module" crossorigin src="./assets/index-D_VeUk1A.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D75bpiXb.css">
 </head>
 <body>
   <div id="dafe-boot" aria-hidden="true">
@@ -900,6 +939,10 @@
           <option value="Liquid Metal">Liquid Metal</option>
           <option value="Neon Wireframe">Neon Wireframe</option>
         </select>
+      </label>
+      <label class="vp-check vp-vpi-row" title="Per-bar volume-imbalance voxels — the signature VPI look">
+        <input type="checkbox" id="vpi-enabled" checked>
+        <span class="vp-vpi-label">VPI <small>per-bar volume</small></span>
       </label>
       <label>Profile Width
         <input type="range" id="vp-width" min="10" max="150" step="5">
@@ -1338,6 +1381,7 @@
     <button class="draw-btn" data-tool="text">T<span class="tooltip">Text · Numpad +</span></button>
     <button class="draw-btn" data-tool="erase">⌫<span class="tooltip">Eraser · click a drawing · Numpad /</span></button>
     <button class="draw-btn" id="draw-clear">🗑<span class="tooltip">Clear all · Numpad *</span></button>
+    <button class="draw-btn" id="draw-minimize" title="Minimize drawing tools" aria-label="Minimize drawing tools">−<span class="tooltip">Minimize drawing tools</span></button>
   </div>
 
   <!-- Trade Advisor FAB -->
@@ -1464,14 +1508,14 @@
     </div>
   </div>
 
-  <!-- Bottom Toolbar -->
+  <!-- Bottom Toolbar — the action bar keeps ONLY the four searches, the
+       menu collapse and settings. Everything else lives in Controls. -->
   <div id="toolbar">
     <div id="toolbar-resize-handle" title="Drag to resize toolbar width"></div>
-    <span class="label" style="color:#00ff88;font-weight:700;letter-spacing:0.5px">DAFE</span>
-    <div class="sep"></div>
+    <span class="label dafe-wordmark">DAFE</span>
     <div class="sep"></div>
 
-    <!-- Symbol Selector -->
+    <!-- Symbol search -->
     <div id="symbol-combo" style="position:relative;display:inline-block">
       <input type="text" id="symbol-input" placeholder="Symbol (search or pick)" maxlength="10" title="Type to search or pick a symbol" style="width:160px" autocomplete="off">
       <div id="symbol-dropdown" style="display:none;position:absolute;left:0;right:0;bottom:100%;margin-bottom:2px;max-height:300px;overflow-y:auto;background:rgba(10,10,25,0.96);border:1px solid rgba(0,204,255,0.2);border-radius:6px;z-index:9999;font-size:10px"></div>
@@ -1481,8 +1525,8 @@
 
     <div class="sep"></div>
 
-    <!-- Bar Type Selector -->
-    <select id="bar-type-select">
+    <!-- Bar type search -->
+    <select id="bar-type-select" title="Bar type">
       <option value="candlestick">Candlestick</option>
       <option value="heikin-ashi">Heikin-Ashi</option>
       <option value="renko">Renko</option>
@@ -1499,8 +1543,8 @@
 
     <div class="sep"></div>
 
-    <!-- Timeframe Select -->
-    <select id="tf-select">
+    <!-- Timeframe search -->
+    <select id="tf-select" title="Timeframe">
       <option value="1s" data-sub-minute="true">1s</option>
       <option value="5s" data-sub-minute="true">5s</option>
       <option value="10s" data-sub-minute="true">10s</option>
@@ -1515,44 +1559,74 @@
       <option value="1w">1w</option>
     </select>
 
-    <select id="pane-dominance" title="Visual dominance when main + lower both present">
-      <option value="both" selected>Both (Main over Lower)</option>
-      <option value="main">Main Only</option>
-      <option value="lower">Lower Only</option>
-    </select>
-
     <div class="sep"></div>
 
-    <button id="mode-toggle" style="display:none">2D <span class="key-hint">Np0</span></button>
+    <!-- Signal mode search — stays on the action bar by request -->
     <select id="indicator-select" title="Load Signal Analysis Model" style="width:110px;padding:2px 4px;font-size:10px;background:rgba(12,12,28,0.9);color:rgba(255,255,255,0.7);border:1px solid rgba(180,140,255,0.15);border-radius:4px;cursor:pointer;">
       <option value="" disabled selected>📊 Signal Models</option>
     </select>
-    <button id="os-open-editor" title="OakScript Editor — write, backtest and apply signal models">⌘ Editor</button>
-    <button id="vp-toggle">VP <span class="key-hint">Np1</span></button>
-    <button id="regime-toggle" title="Toggle the Regime Ribbon (advisory market-state strip at the top of the chart)">◉ Regime</button>
-    <div id="widgets-combo" style="position:relative;display:inline-block">
-      <button id="widgets-toggle" title="Show or hide widgets">▤ Widgets</button>
-      <div id="widgets-menu" style="display:none;position:absolute;right:0;bottom:100%;margin-bottom:2px;background:rgba(10,10,25,0.96);border:1px solid rgba(180,140,255,0.2);border-radius:6px;z-index:9999;font-size:11px;min-width:170px;padding:4px 0;"></div>
-    </div>
-    <button id="auto-refresh-toggle" title="Auto-refresh (off): reload bars from the selected data source every 30 s">◷ Auto</button>
-    <button id="chart-reset" title="Reset chart view (zoom, pan, scale)">⟳ Reset</button>
-    <button id="lower-frame-btn" title="Frame All — recentre the 3D lower deck on the whole instrument">⛶ Frame</button>
-    <button id="settings-toggle" title="Settings">⚙</button>
-    <button id="toolbar-collapse" title="Collapse toolbar">▲</button>
-    <select id="perf-select" title="Performance mode">
-      <option value="auto" selected>Auto</option>
-      <option value="ultra">Ultra</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
-    </select>
 
     <div class="sep"></div>
 
-    <div class="vpi-settings">
-      <input type="checkbox" id="vpi-enabled" checked>
-      <label for="vpi-enabled">VPI</label>
+    <!-- The single master menu. Its look stays flat/focused like the other
+         toolbar buttons; only the detailing is refined. -->
+    <div id="widgets-combo" class="controls-combo">
+      <button id="widgets-toggle" class="controls-toggle" title="Controls — view, volume profile, models, data, appearance and windows">▤ Controls</button>
+      <div id="widgets-menu" class="controls-menu">
+        <div class="controls-menu-head">
+          <span class="controls-kicker">DAFE / CONTROL DECK</span>
+          <span class="controls-title">CONTROLS</span>
+        </div>
+        <div class="controls-scroll">
+          <section class="controls-group">
+            <div class="controls-group-label"><span>01</span> VIEW</div>
+            <div class="controls-row"><span class="controls-key">Bar view</span><button id="mode-toggle" class="controls-btn" title="Toggle 2D / 3D chart (Np0)">3D</button></div>
+            <div class="controls-row"><span class="controls-key">Pane focus</span><select id="pane-dominance" title="Visual dominance when main + lower both present"><option value="both" selected>Both (Main over Lower)</option><option value="main">Main Only</option><option value="lower">Lower Only</option></select></div>
+            <div class="controls-row"><span class="controls-key">Frame lower</span><button id="lower-frame-btn" class="controls-btn" title="Frame All — recentre the 3D lower deck on the whole instrument">⛶ Frame</button></div>
+            <div class="controls-row"><span class="controls-key">Reset view</span><button id="chart-reset" class="controls-btn" title="Reset chart view (zoom, pan, scale)">⟳ Reset</button></div>
+          </section>
+
+          <section class="controls-group">
+            <div class="controls-group-label"><span>02</span> VOLUME PROFILE</div>
+            <div class="controls-row"><span class="controls-key">Profile</span><button id="vp-toggle" class="controls-btn" data-controls-close title="Open the Volume Profile panel — 3D inputs, VPI and themes">VP 3D</button></div>
+            <p class="controls-note">3D inputs, VPI, value area and themes live inside the profile panel.</p>
+          </section>
+
+          <section class="controls-group">
+            <div class="controls-group-label"><span>03</span> SIGNALS &amp; MODELS</div>
+            <div class="controls-row"><span class="controls-key">Editor</span><button id="os-open-editor" class="controls-btn" data-controls-close title="OakScript Editor — write, apply and refine signal models">⌘ Editor</button></div>
+            <div class="controls-row"><span class="controls-key">Backtest</span><button id="os-open-backtest" class="controls-btn" data-controls-close title="Backtest Studio — equity surface, risk metrics and trade replay">⏱ Backtest</button></div>
+            <div class="controls-row"><span class="controls-key">Optimize</span><button id="os-open-optimize" class="controls-btn" data-controls-close title="Optimizer Lab — combinatorial parameter search and 3D score landscape">🎯 Optimize</button></div>
+            <div class="controls-row"><span class="controls-key">ML Labs</span><button id="os-open-ml-lab" class="controls-btn" data-controls-close title="ML Labs — supervised models, RL policies and inference visuals">🧠 ML Labs</button></div>
+            <div class="controls-row"><span class="controls-key">Performance</span><button id="os-open-performance" class="controls-btn" data-controls-close title="Performance & Review — metrics, statistics, advisor review and PDF/email reports">📊 Performance</button></div>
+            <div class="controls-row"><span class="controls-key">Alerts</span><button id="os-open-alerts" class="controls-btn" data-controls-close title="Signal Alerts — firing history with fire-time variable provenance">🔔 Alerts</button></div>
+          </section>
+
+          <section class="controls-group">
+            <div class="controls-group-label"><span>04</span> DATA</div>
+            <div class="controls-row"><span class="controls-key">Auto refresh</span><button id="auto-refresh-toggle" class="controls-btn" title="Reload bars from the selected data source every 30 s">◷ Auto</button></div>
+          </section>
+
+          <section class="controls-group">
+            <div class="controls-group-label"><span>05</span> PERFORMANCE</div>
+            <div class="controls-row"><span class="controls-key">Render mode</span><select id="perf-select" title="Performance mode"><option value="auto" selected>Auto</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div>
+          </section>
+
+          <section class="controls-group">
+            <div class="controls-group-label"><span>06</span> APPEARANCE</div>
+            <div class="controls-row"><span class="controls-key">Visual editor</span><span id="controls-visuals-slot" class="controls-slot"></span></div>
+          </section>
+
+          <section class="controls-group controls-group--windows">
+            <div class="controls-group-label"><span>07</span> WINDOWS</div>
+            <div id="widgets-list" class="controls-widget-list"></div>
+          </section>
+        </div>
+      </div>
     </div>
+
+    <button id="settings-toggle" title="Settings">⚙</button>
+    <button id="toolbar-collapse" title="Collapse toolbar">▲</button>
   </div>
 
 </body>
