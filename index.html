@@ -794,6 +794,48 @@
       width: 90px !important; text-align: center; font-weight: 600;
       font-family: monospace !important;
     }
+    /* Focus rail — every setting is kept, but one group is shown at a time. */
+    .settings-nav {
+      position: sticky; top: -16px; z-index: 3;
+      display: flex; flex-wrap: wrap; gap: 5px;
+      padding: 7px 6px; margin: -6px -6px 0;
+      background: linear-gradient(180deg, rgba(10,14,28,0.98), rgba(10,14,28,0.88));
+      border-bottom: 1px solid rgba(124,232,255,0.14);
+      backdrop-filter: blur(8px);
+    }
+    .settings-nav button {
+      padding: 5px 9px; border-radius: 999px; cursor: pointer;
+      border: 1px solid rgba(124,232,255,0.18); background: rgba(124,232,255,0.05);
+      color: rgba(225,242,255,0.62); font: 700 9px/1.2 var(--hud-mono, monospace);
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .settings-nav button:hover { color: #e2f7ff; border-color: rgba(124,232,255,0.45); }
+    .settings-nav button.active {
+      color: #06131d; background: #7ce8ff; border-color: #7ce8ff;
+      box-shadow: 0 0 14px rgba(124,232,255,0.3);
+    }
+    .settings-section[hidden] { display: none !important; }
+    .settings-subcard {
+      border: 1px solid rgba(0,204,255,0.16);
+      border-radius: 9px; padding: 10px;
+      display: flex; flex-direction: column; gap: 8px;
+      background: linear-gradient(140deg, rgba(0,204,255,0.05), rgba(180,140,255,0.04)), rgba(4,9,20,0.6);
+    }
+    .settings-group-note {
+      color: rgba(200,224,255,0.42); font-size: 9px;
+      line-height: 1.5; padding: 0 4px;
+    }
+    .hotkey-group-label {
+      color: #ffd166; font-size: 9px; font-weight: 800;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .hotkey-grid.trading {
+      border-left: 2px solid rgba(255,209,102,0.55);
+      padding-left: 10px;
+    }
+    .hotkey-grid.trading .hotkey-input { color: #ffd166 !important; }
+    .hotkey-enable { white-space: normal !important; }
     #settings-save {
       padding: 8px 16px; border: 1px solid rgba(0,255,136,0.3);
       border-radius: 8px; background: rgba(0,255,136,0.08);
@@ -941,8 +983,8 @@
       to   { opacity: 0.95; transform: scale(1.08); }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-DbepgjHR.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-o9JH6XVZ.css">
+  <script type="module" crossorigin src="./assets/index-DntHzDq3.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dk2vWCZ-.css">
 </head>
 <body>
   <div id="dafe-boot" aria-hidden="true">
@@ -1035,7 +1077,16 @@
       <button id="settings-close" title="Close">✕</button>
     </div>
     <div id="settings-body">
-      <div class="settings-section" id="account-section" style="display:none">
+      <nav class="settings-nav" id="settings-nav" aria-label="Settings groups">
+        <button type="button" data-settings-group="account">Account</button>
+        <button type="button" data-settings-group="ai">LLM Configuration</button>
+        <button type="button" data-settings-group="data">Data Providers</button>
+        <button type="button" data-settings-group="trading">Trading Accounts</button>
+        <button type="button" data-settings-group="display">Display</button>
+        <button type="button" data-settings-group="utilities">Utilities</button>
+        <button type="button" data-settings-group="all">All</button>
+      </nav>
+      <div class="settings-section" id="account-section" data-settings-group="account" style="display:none">
         <div class="settings-section-title">Account</div>
         <div id="account-name" style="font-size:12px;color:rgba(255,255,255,0.78);margin-bottom:3px;"></div>
         <div id="account-since" style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:10px;"></div>
@@ -1044,23 +1095,11 @@
         <button id="account-signout" style="padding:7px 14px;border:1px solid rgba(255,68,119,0.35);border-radius:6px;background:rgba(255,68,119,0.08);color:rgba(255,140,170,0.9);font-family:inherit;font-size:10px;font-weight:700;letter-spacing:0.6px;cursor:pointer;margin-top:10px;">SIGN OUT</button>
         <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;margin-top:8px;">Signing out returns to the painted sign-in screen. Delete a profile to remove it from this device permanently.</div>
       </div>
-      <div class="settings-section pk-section themed-section">
+      <div class="settings-section pk-section themed-section" data-settings-group="trading">
         <div class="pk-head">
           <div>
-            <div class="pk-title">API Credentials</div>
-            <div class="pk-sub">keys encrypted on this machine</div>
-          </div>
-        </div>
-        <div class="pk-card">
-          <label>API Key <input type="password" id="set-massive-key" placeholder="Enter API key"></label>
-          <label>SerpAPI Key <input type="password" id="set-serp-key" placeholder="Enter API key"></label>
-        </div>
-      </div>
-      <div class="settings-section pk-section themed-section">
-        <div class="pk-head">
-          <div>
-            <div class="pk-title">Brokerage — Tradovate</div>
-            <div class="pk-sub">paper default · demo unless you switch to live</div>
+            <div class="pk-title">Trading Accounts</div>
+            <div class="pk-sub">Tradovate credentials and paper execution — paper is the default</div>
           </div>
         </div>
         <div class="pk-card">
@@ -1073,16 +1112,49 @@
             </select>
           </label>
         </div>
+        <div class="settings-section-title" style="margin-top:6px;">Paper Trading</div>
+        <label>Starting Cash
+          <input type="number" id="set-trade-cash" value="100000" min="0" step="1000">
+        </label>
+        <label>Commission Mode
+          <select id="set-trade-comm-mode">
+            <option value="per-trade">Flat $ per trade</option>
+            <option value="per-share">$ per share</option>
+            <option value="per-contract">$ per contract</option>
+          </select>
+        </label>
+        <label>Commission Value ($)
+          <input type="number" id="set-trade-comm-value" value="1.00" min="0" step="0.01">
+        </label>
+        <label>Slippage Mode
+          <select id="set-trade-slip-mode">
+            <option value="fixed-ticks">Fixed ticks</option>
+            <option value="percent">% of price</option>
+          </select>
+        </label>
+        <label>Slippage Value
+          <input type="number" id="set-trade-slip-value" value="1" min="0" step="0.1">
+        </label>
+        <label>Tick Size ($, for fixed-ticks)
+          <input type="number" id="set-trade-tick-size" value="0.01" min="0.0001" step="0.0001">
+        </label>
+        <div id="set-trade-formula-preview" style="color:rgba(180,140,255,0.4);font-size:9px;margin-top:3px;line-height:1.4;"></div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+          <input type="checkbox" id="set-trade-hide-markers" style="width:auto;">
+          <span>Hide execution markers on chart</span>
+        </label>
+        <button id="set-trade-clear" class="settings-action-btn danger" style="margin-top:8px;">Clear Trade History (start fresh)</button>
+        <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">Resets cash, positions, and open orders back to a fresh account. Chart execution markers are kept.</div>
       </div>
-      <div class="settings-section pk-section themed-section">
+      <div class="settings-section pk-section themed-section" data-settings-group="data">
         <div class="pk-head">
           <div>
-            <div class="pk-title">Universal Data Providers</div>
+            <div class="pk-title">Data Providers</div>
             <div class="pk-sub">one adapter converts every feed to internal bars</div>
           </div>
           <button id="dp-refresh" class="pk-refresh" title="Refresh providers">⟳</button>
         </div>
-        <div class="pk-hint">Connect ANY market-data provider. Presets know their response shape; Custom REST takes a URL template + field mapping. Save, Test (fetches real SPY bars through the adapter), then pick it under Data → Source.</div>
+        <div class="pk-hint">Connect ANY market-data provider. Presets know their response shape; Custom REST takes a URL template + field mapping. Save, Test (fetches real SPY bars through the adapter), then pick the source below.</div>
         <select id="dp-provider" class="pk-select"></select>
         <div class="pk-card">
           <div class="pk-row-top">
@@ -1104,37 +1176,48 @@
           <div id="dp-status" class="pk-status"></div>
           <div id="dp-note" class="pk-note"></div>
         </div>
+        <div class="settings-section-title" style="margin-top:6px;">Feed source</div>
+        <label>Source
+          <select id="set-data-source">
+            <option value="yahoo">Yahoo Finance (free)</option>
+            <option value="massive">Massive / Polygon</option>
+            <option value="polygon">Polygon.io (adapter)</option>
+            <option value="alpaca">Alpaca (adapter)</option>
+            <option value="twelvedata">Twelve Data (adapter)</option>
+            <option value="custom">Custom REST (adapter)</option>
+          </select>
+        </label>
       </div>
-      <div class="settings-section pk-section">
-        <div class="pk-head">
-          <div>
-            <div class="pk-title">Provider API Keys</div>
-            <div class="pk-sub">keys encrypted on this machine</div>
-          </div>
-          <button id="pk-refresh" class="pk-refresh" title="Refresh providers">⟳</button>
-        </div>
-        <div class="pk-hint">Run the advisor and the OakScript coder on a hosted model when local hosting is too heavy. Save a key, test it, then choose the provider below.</div>
-        <select id="pk-provider" class="pk-select"></select>
-        <div id="pk-card" class="pk-card">
-          <div class="pk-row-top">
-            <span class="pk-label"><span id="pk-dot" class="pk-dot"></span><span id="pk-label">OpenCode</span></span>
-            <span id="pk-masked" class="pk-masked">no key</span>
-          </div>
-          <div class="pk-inputs">
-            <input id="pk-key" type="password" placeholder="Paste API key" autocomplete="off" spellcheck="false">
-            <input id="pk-url" type="text" placeholder="https://…/v1" spellcheck="false">
-            <div class="pk-actions">
-              <button id="pk-save" class="pk-btn save">Save</button>
-              <button id="pk-test" class="pk-btn test">Test</button>
-              <button id="pk-clear" class="pk-btn clear" title="Remove key">✕</button>
-            </div>
-          </div>
-          <div id="pk-status" class="pk-status"></div>
-          <div id="pk-note" class="pk-note"></div>
-        </div>
-      </div>
-      <div class="settings-section">
+      <div class="settings-section" data-settings-group="ai">
         <div class="settings-section-title">LLM Configuration</div>
+        <div class="settings-subcard">
+          <div class="pk-head">
+            <div>
+              <div class="pk-title">Agentic API Keys</div>
+              <div class="pk-sub">encrypted on this machine · advisor and coder can use different providers</div>
+            </div>
+            <button id="pk-refresh" class="pk-refresh" title="Refresh providers">⟳</button>
+          </div>
+          <div class="pk-hint">Run the advisor and the OakScript coder on a hosted model when local hosting is too heavy. Save a key, test it, then choose the provider in the roles below.</div>
+          <select id="pk-provider" class="pk-select"></select>
+          <div id="pk-card" class="pk-card">
+            <div class="pk-row-top">
+              <span class="pk-label"><span id="pk-dot" class="pk-dot"></span><span id="pk-label">OpenCode</span></span>
+              <span id="pk-masked" class="pk-masked">no key</span>
+            </div>
+            <div class="pk-inputs">
+              <input id="pk-key" type="password" placeholder="Paste API key" autocomplete="off" spellcheck="false">
+              <input id="pk-url" type="text" placeholder="https://…/v1" spellcheck="false">
+              <div class="pk-actions">
+                <button id="pk-save" class="pk-btn save">Save</button>
+                <button id="pk-test" class="pk-btn test">Test</button>
+                <button id="pk-clear" class="pk-btn clear" title="Remove key">✕</button>
+              </div>
+            </div>
+            <div id="pk-status" class="pk-status"></div>
+            <div id="pk-note" class="pk-note"></div>
+          </div>
+        </div>
         <label>Trade Advisor Provider
           <select id="set-llm-provider">
             <option value="local">Local (this GPU / llama.cpp)</option>
@@ -1247,104 +1330,7 @@
         </label>
         <div id="set-hardware-info" style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;"></div>
       </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Data</div>
-        <label>Source
-          <select id="set-data-source">
-            <option value="yahoo">Yahoo Finance (free)</option>
-            <option value="massive">Massive / Polygon</option>
-            <option value="polygon">Polygon.io (adapter)</option>
-            <option value="alpaca">Alpaca (adapter)</option>
-            <option value="twelvedata">Twelve Data (adapter)</option>
-            <option value="custom">Custom REST (adapter)</option>
-          </select>
-        </label>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Paper Trading</div>
-        <label>Starting Cash
-          <input type="number" id="set-trade-cash" value="100000" min="0" step="1000">
-        </label>
-        <label>Commission Mode
-          <select id="set-trade-comm-mode">
-            <option value="per-trade">Flat $ per trade</option>
-            <option value="per-share">$ per share</option>
-            <option value="per-contract">$ per contract</option>
-          </select>
-        </label>
-        <label>Commission Value ($)
-          <input type="number" id="set-trade-comm-value" value="1.00" min="0" step="0.01">
-        </label>
-        <label>Slippage Mode
-          <select id="set-trade-slip-mode">
-            <option value="fixed-ticks">Fixed ticks</option>
-            <option value="percent">% of price</option>
-          </select>
-        </label>
-        <label>Slippage Value
-          <input type="number" id="set-trade-slip-value" value="1" min="0" step="0.1">
-        </label>
-        <label>Tick Size ($, for fixed-ticks)
-          <input type="number" id="set-trade-tick-size" value="0.01" min="0.0001" step="0.0001">
-        </label>
-        <div id="set-trade-formula-preview" style="color:rgba(180,140,255,0.4);font-size:9px;margin-top:3px;line-height:1.4;"></div>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-          <input type="checkbox" id="set-trade-hide-markers" style="width:auto;">
-          <span>Hide execution markers on chart</span>
-        </label>
-        <button id="set-trade-clear" class="settings-action-btn danger" style="margin-top:8px;">Clear Trade History (start fresh)</button>
-        <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">Resets cash, positions, and open orders back to a fresh account. Chart execution markers are kept.</div>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Signal Analysis Models</div>
-        <button id="set-open-editor" class="settings-action-btn">Open OakScript Editor</button>
-        <button id="set-open-oakguard" class="settings-action-btn" style="margin-top:6px;">⬢ OAKGUARD — the editor model writes the rules, a referee decides</button>
-        <div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px;line-height:1.4;">OakGuard: when code passes the validator but breaks at runtime, the model you selected for the editor writes a declarative rule that would have caught it. An independent referee tests it against broken variants (some held out) and known-good scripts, and promotes only rules that pass every gate. Promoted rules enforce live in the editor validator. Without a backend, OakGuard replays a recorded run.</div>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Audit Trail</div>
-        <button id="set-open-ledger" class="settings-action-btn">🔗 View Glass Ledger</button>
-        <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">A tamper-evident, hash-chained record of trade fills and signal model saves/deletes.</div>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Storyboard</div>
-        <button id="set-open-storyboard" class="settings-action-btn">📖 View Storyboard</button>
-        <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">A chronological log of noteworthy moments — pin your own notes, or let fired alerts pin themselves.</div>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Accessibility</div>
-
-        <label style="margin-bottom:6px;">Time axis clock
-          <select id="set-hour-cycle" style="flex:0 0 auto;width:172px;">
-            <option value="12">Standard — 12-hour (1:00)</option>
-            <option value="24">Military — 24-hour (13:00)</option>
-          </select>
-        </label>
-
-        <label class="check-row">
-          <input type="checkbox" id="set-accessible-palette">
-          <span>Colorblind-safe signal palette (blue/orange instead of green/red for buy/sell and alerts)</span>
-        </label>
-        <label class="check-row" style="margin-top:6px;">
-          <input type="checkbox" id="set-sonification">
-          <span>🔊 Sound cues for alerts and trade fills</span>
-        </label>
-      </div>
-      <div class="settings-section">
-        <div class="settings-section-title">Interface Glow</div>
-        <label class="check-row">
-          <input type="checkbox" id="set-glow-enabled" checked>
-          <span>Sync one glow color across the main menu, advisor bubble/chat, trading/news panels, settings sections and dashboards</span>
-        </label>
-        <label style="margin-top:6px;">Glow color
-          <input type="color" id="set-glow-color" value="#2dffb3" style="flex:0 0 auto;width:52px;height:26px;padding:0;cursor:pointer;">
-        </label>
-        <label style="margin-top:6px;">Glow brightness <span id="glow-brightness-val" style="color:#9be8ff;">100%</span>
-          <input type="range" id="set-glow-brightness" min="20" max="160" step="5" value="100" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
-        </label>
-        <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;">Theme applies to: main menu, OakGuard, advisor, trading panel, news, settings sections, visual editor and dashboards. Brightness controls how visible the glow is everywhere.</div>
-      </div>
-      <div class="settings-section">
+      <div class="settings-section" data-settings-group="display">
         <div class="settings-section-title">Display</div>
         <label>Background
           <select id="set-bg-viz">
@@ -1383,8 +1369,51 @@
           <input type="range" id="set-3d-bg" min="0" max="2.2" step="0.05" value="1" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
         </label>
         <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;">Applies to the 3D main chart and the 3D lower deck together. Exposure lifts the whole scene; bar brightness targets the candles; background brightness changes the deep-space base.</div>
-      <div class="settings-section">
-        <div class="settings-section-title">Hotkeys (Numpad, fixed)</div>
+        <div class="settings-section-title" style="margin-top:10px;">Interface Glow</div>
+        <label class="check-row">
+          <input type="checkbox" id="set-glow-enabled" checked>
+          <span>Sync one glow color across the main menu, advisor bubble/chat, trading/news panels, settings sections and dashboards</span>
+        </label>
+        <label style="margin-top:6px;">Glow color
+          <input type="color" id="set-glow-color" value="#2dffb3" style="flex:0 0 auto;width:52px;height:26px;padding:0;cursor:pointer;">
+        </label>
+        <label style="margin-top:6px;">Glow brightness <span id="glow-brightness-val" style="color:#9be8ff;">100%</span>
+          <input type="range" id="set-glow-brightness" min="20" max="160" step="5" value="100" style="flex:1;accent-color:#6fd6ff;cursor:pointer;">
+        </label>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;line-height:1.4;">Theme applies to: main menu, OakGuard, advisor, trading panel, news, settings sections, visual editor and dashboards. Brightness controls how visible the glow is everywhere.</div>
+      </div>
+      <div class="settings-section" data-settings-group="utilities">
+        <div class="settings-section-title">Utilities</div>
+        <div class="settings-section-title" style="margin-top:6px;">OakGuard</div>
+        <button id="set-open-oakguard" class="settings-action-btn">⬢ OAKGUARD — the editor model writes the rules, a referee decides</button>
+        <div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px;line-height:1.4;">When code passes the validator but breaks at runtime, the editor's model writes a declarative rule that would have caught it. An independent referee tests it against broken variants (some held out) and known-good scripts, and promotes only rules that pass every gate. Promoted rules enforce live in the editor validator. Without a backend, OakGuard replays a recorded run.</div>
+        <div class="settings-section-title" style="margin-top:10px;">Audit Trail</div>
+        <button id="set-open-ledger" class="settings-action-btn">🔗 View Glass Ledger</button>
+        <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">A tamper-evident, hash-chained record of trade fills and signal model saves/deletes.</div>
+        <div class="settings-section-title" style="margin-top:10px;">Storyboard</div>
+        <button id="set-open-storyboard" class="settings-action-btn">📖 View Storyboard</button>
+        <div style="color:rgba(255,255,255,0.25);font-size:9px;margin-top:4px;">A chronological log of noteworthy moments — pin your own notes, or let fired alerts pin themselves.</div>
+        <div class="settings-section-title" style="margin-top:10px;">Accessibility</div>
+        <label style="margin-bottom:6px;">Time axis clock
+          <select id="set-hour-cycle" style="flex:0 0 auto;width:172px;">
+            <option value="12">Standard — 12-hour (1:00)</option>
+            <option value="24">Military — 24-hour (13:00)</option>
+          </select>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="set-accessible-palette">
+          <span>Colorblind-safe signal palette (blue/orange instead of green/red for buy/sell and alerts)</span>
+        </label>
+        <label class="check-row" style="margin-top:6px;">
+          <input type="checkbox" id="set-sonification">
+          <span>🔊 Sound cues for alerts and trade fills</span>
+        </label>
+        <div class="settings-section-title" style="margin-top:10px;">Hotkeys</div>
+        <label class="hotkey-enable">Keyboard shortcuts
+          <input type="checkbox" id="set-hotkeys-enabled" checked title="Turn every keyboard shortcut on or off">
+        </label>
+        <div class="settings-group-note">Off means mouse and menus only: chart, editor and trading shortcuts all stop responding.</div>
+        <div class="hotkey-group-label">Chart &amp; Tools</div>
         <div class="hotkey-grid">
           <label>3D Mode <input type="text" id="hk-3d" value="Numpad0" class="hotkey-input" disabled title="Fixed numpad key"></label>
           <label>Volume Profile <input type="text" id="hk-vp" value="Numpad1" class="hotkey-input" disabled title="Fixed numpad key"></label>
@@ -1400,9 +1429,16 @@
           <label>Undo Drawing <input type="text" id="hk-undo" value="NumpadSubtract" class="hotkey-input" disabled title="Fixed numpad key"></label>
           <label>Clear All <input type="text" id="hk-clear" value="NumpadMultiply" class="hotkey-input" disabled title="Fixed numpad key"></label>
           <label>Deselect <input type="text" id="hk-deselect" value="NumpadDecimal" class="hotkey-input" disabled title="Fixed numpad key"></label>
-    </div>
-    </div>
-  </div>
+          <label>Eraser <input type="text" id="hk-erase" value="NumpadDivide" class="hotkey-input" disabled title="Fixed numpad key"></label>
+        </div>
+        <div class="hotkey-group-label">Trading · paper orders</div>
+        <div class="hotkey-grid trading">
+          <label>Market Buy <input type="text" id="hk-buy" value="Alt + Shift + B" class="hotkey-input" disabled title="Fixed combination — paper order"></label>
+          <label>Market Sell <input type="text" id="hk-sell" value="Alt + Shift + S" class="hotkey-input" disabled title="Fixed combination — paper order"></label>
+          <label>Close All <input type="text" id="hk-closeall" value="Alt + Shift + X" class="hotkey-input" disabled title="Fixed combination — flatten paper positions"></label>
+        </div>
+        <div class="settings-group-note">Trading keys are grouped apart from chart keys and need a modifier, so a stray key can never place an order. They always use the paper broker.</div>
+      </div>
       <button id="settings-save">Save Settings</button>
       <span id="settings-status" style="font-size:11px;color:rgba(0,255,136,0.6);display:none"></span>
     </div>
@@ -1627,11 +1663,10 @@
     <!-- The single master menu. Its look stays flat/focused like the other
          toolbar buttons; only the detailing is refined. -->
     <div id="widgets-combo" class="controls-combo">
-      <button id="widgets-toggle" class="controls-toggle" title="Controls — view, volume profile, models, data, appearance and windows">▤ Controls</button>
+      <button id="widgets-toggle" class="controls-toggle" title="Control Deck — view, volume profile, models, data, appearance and windows">▤ Control Deck</button>
       <div id="widgets-menu" class="controls-menu">
         <div class="controls-menu-head">
-          <span class="controls-kicker">DAFE / CONTROL DECK</span>
-          <span class="controls-title">CONTROLS</span>
+          <span class="controls-title">Control Deck</span>
         </div>
         <div class="controls-scroll">
           <section class="controls-group">
